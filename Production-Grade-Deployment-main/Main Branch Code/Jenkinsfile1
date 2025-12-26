@@ -7,7 +7,7 @@ pipeline {
     }
 
     environment {
-        APP_NAME   = "multibranch-flask-app"
+        APP_NAME  = "multibranch-flask-app"
         IMAGE_TAG = "latest"
     }
 
@@ -26,16 +26,15 @@ pipeline {
                 dir('Production-Grade-Deployment-main/Main Branch Code') {
                     sh '''
                         set -e
-                        ls -l
                         docker build -t ${APP_NAME}:${IMAGE_TAG} .
                     '''
                 }
             }
         }
 
-        stage('Login to Docker Hub') {
+        stage('Login, Tag, Push & Run') {
             steps {
-                echo "=== Docker Hub Login ==="
+                echo "=== Docker Login, Push & Run ==="
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-creds',
                     usernameVariable: 'DOCKER_USER',
@@ -43,42 +42,23 @@ pipeline {
                 )]) {
                     sh '''
                         set -e
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                    '''
-                }
-            }
-        }
 
-        stage('Tag & Push Docker Image') {
-            steps {
-                echo "=== Tag & Push Docker Image ==="
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh '''
-                        set -e
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
                         docker tag ${APP_NAME}:${IMAGE_TAG} \
                           $DOCKER_USER/${APP_NAME}:${IMAGE_TAG}
 
                         docker push $DOCKER_USER/${APP_NAME}:${IMAGE_TAG}
+
+                        docker rm -f flask-app || true
+                        docker run -d \
+                          --name flask-app \
+                          -p 5000:5000 \
+                          $DOCKER_USER/${APP_NAME}:${IMAGE_TAG}
+
+                        docker logout
                     '''
                 }
-            }
-        }
-
-        stage('Run Docker Container') {
-            steps {
-                echo "=== Run Docker Container ==="
-                sh '''
-                    set -e
-                    docker rm -f flask-app || true
-                    docker run -d \
-                      --name flask-app \
-                      -p 5000:8000 \
-                      $DOCKER_USER/${APP_NAME}:${IMAGE_TAG}
-                '''
             }
         }
     }
@@ -89,11 +69,6 @@ pipeline {
         }
         failure {
             echo "❌ Pipeline failed"
-        }
-        cleanup {
-            sh '''
-                docker logout || true
-            '''
         }
     }
 }
