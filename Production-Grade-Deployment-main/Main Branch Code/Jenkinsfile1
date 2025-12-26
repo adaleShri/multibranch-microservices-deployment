@@ -14,60 +14,57 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                echo "=== Checking out code ==="
+                echo "=== Checkout Source Code ==="
                 checkout scm
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                echo "=== Building Docker Image ==="
-                dir('Main Branch Code') {
-                    sh """
-                    docker build \
-                      -f ../Dockerfile \
-                      -t ${IMAGE_NAME}:${IMAGE_TAG} \
-                      .
-                    """
+                echo "=== Build Docker Image ==="
+                dir('Production-Grade-Deployment-main/Main Branch Code') {
+                    sh '''
+                    ls -l
+                    docker build -t krishna/multibranch-flask-app:latest .
+                    '''
                 }
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                echo "=== Pushing Docker Image ==="
+                echo "=== Push Docker Image ==="
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-creds',
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    sh """
+                    sh '''
                     echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_USER}/${IMAGE_NAME}:${IMAGE_TAG}
-                    docker push ${DOCKER_USER}/${IMAGE_NAME}:${IMAGE_TAG}
-                    """
+                    docker tag krishna/multibranch-flask-app:latest $DOCKER_USER/krishna/multibranch-flask-app:latest
+                    docker push $DOCKER_USER/krishna/multibranch-flask-app:latest
+                    '''
                 }
             }
         }
 
         stage('Run Docker Container') {
             steps {
-                echo "=== Running Docker Container ==="
-                sh """
-                docker pull ${IMAGE_NAME}:${IMAGE_TAG} || true
+                echo "=== Run Docker Container ==="
+                sh '''
                 docker rm -f flask-app || true
                 docker run -d \
                   --name flask-app \
                   -p 5000:8000 \
-                  ${IMAGE_NAME}:${IMAGE_TAG}
-                """
+                  krishna/multibranch-flask-app:latest
+                '''
             }
         }
     }
 
     post {
         success {
-            echo "🚀 Docker build, push, and deployment successful"
+            echo "🚀 Docker build, push, and run completed successfully"
         }
         failure {
             echo "❌ Pipeline failed"
