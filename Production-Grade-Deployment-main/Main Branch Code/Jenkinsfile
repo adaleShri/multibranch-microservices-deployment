@@ -53,8 +53,8 @@ pipeline {
                 dir('Production-Grade-Deployment-main/Main Branch Code/k8s') {
                     sh '''
                         set -e
-                        kubectl apply -f deployment.yml
-                        kubectl apply -f service.yml
+                        kubectl apply -f deployment.yaml
+                        kubectl apply -f service.yaml
                     '''
                 }
             }
