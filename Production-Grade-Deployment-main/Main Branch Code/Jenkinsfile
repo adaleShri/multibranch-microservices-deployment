@@ -1,66 +1,70 @@
-stage('Checkout') {
-    steps {
-        echo "=== Checkout Source Code ==="
-        checkout scm
+pipeline {
+    agent any
+
+    environment {
+        APP_NAME  = "multibranch-flask-app"
+        IMAGE_TAG = "latest"
+        REPO_URL  = "https://github.com/adaleShri/multibranch-microservices-deployment.git"
     }
-}
 
-stage('Build Docker Image') {
-    steps {
-        echo "=== Build Docker Image ==="
-        sh '''
-            set -e
-            docker build -t ${APP_NAME}:${IMAGE_TAG} .
-        '''
-    }
-}
+    stages {
 
-stage('Push Docker Image') {
-    steps {
-        echo "=== Push Docker Image to Docker Hub ==="
-        withCredentials([usernamePassword(
-            credentialsId: 'dockerhub-creds',
-            usernameVariable: 'DOCKER_USER',
-            passwordVariable: 'DOCKER_PASS'
-        )]) {
-            sh '''
-                set -e
-                echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+        stage('Checkout') {
+            steps {
+                echo "=== Checkout Source Code from GitHub ==="
+                git branch: 'main', url: "${REPO_URL}"
+            }
+        }
 
-                docker tag ${APP_NAME}:${IMAGE_TAG} \
-                  $DOCKER_USER/${APP_NAME}:${IMAGE_TAG}
+        stage('Build Docker Image') {
+            steps {
+                echo "=== Build Docker Image ==="
+                sh '''
+                    set -e
+                    docker build -t ${APP_NAME}:${IMAGE_TAG} .
+                '''
+            }
+        }
 
-                docker push $DOCKER_USER/${APP_NAME}:${IMAGE_TAG}
+        stage('Push Docker Image') {
+            steps {
+                echo "=== Push Docker Image to Docker Hub ==="
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh '''
+                        set -e
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker tag ${APP_NAME}:${IMAGE_TAG} $DOCKER_USER/${APP_NAME}:${IMAGE_TAG}
+                        docker push $DOCKER_USER/${APP_NAME}:${IMAGE_TAG}
+                        docker logout
+                    '''
+                }
+            }
+        }
 
-                docker logout
-            '''
+        stage('Deploy to Kubernetes') {
+            steps {
+                echo "=== Deploy to Kubernetes ==="
+                withCredentials([file(credentialsId: 'kubeconfig-creds', variable: 'KUBECONFIG')]) {
+                    sh '''
+                        set -e
+                        kubectl set image deployment/flask-app flask-app=$DOCKER_USER/${APP_NAME}:${IMAGE_TAG} --namespace=default
+                        kubectl rollout status deployment/flask-app --namespace=default
+                    '''
+                }
+            }
         }
     }
-}
 
-stage('Deploy Docker Container') {
-    steps {
-        echo "=== Deploy Docker Container ==="
-        sh '''
-            set -e
-            docker rm -f flask-app || true
-            docker run -d \
-              --name flask-app \
-              -p 5000:5000 \
-              $DOCKER_USER/${APP_NAME}:${IMAGE_TAG}
-        '''
-    }
-}
-
-stage('Deploy to Kubernetes') {
-    steps {
-        echo "=== Deploy to Kubernetes ==="
-        withCredentials([file(credentialsId: 'kubeconfig-creds', variable: 'KUBECONFIG')]) {
-            sh '''
-                set -e
-                kubectl apply -f k8s/
-                kubectl rollout status deployment/flask-app
-            '''
+    post {
+        success {
+            echo "🚀 Pipeline completed successfully!"
+        }
+        failure {
+            echo "❌ Pipeline failed!"
         }
     }
 }
