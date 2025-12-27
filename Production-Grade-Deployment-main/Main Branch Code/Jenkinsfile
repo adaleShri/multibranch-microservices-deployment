@@ -19,10 +19,12 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 echo "=== Build Docker Image ==="
-                sh '''
-                    set -e
-                    docker build -t ${APP_NAME}:${IMAGE_TAG} .
-                '''
+                dir('Production-Grade-Deployment-main/Main Branch Code') {
+                    sh '''
+                        set -e
+                        docker build -t ${APP_NAME}:${IMAGE_TAG} .
+                    '''
+                }
             }
         }
 
