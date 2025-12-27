@@ -47,14 +47,14 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Deploy k8s') {
             steps {
-                echo "=== Deploy to Kubernetes ==="
-                withCredentials([file(credentialsId: 'kubeconfig-creds', variable: 'KUBECONFIG')]) {
+                echo "=== Deploying to Kubernetes ==="
+                dir('Production-Grade-Deployment-main/Main Branch Code/k8s') {
                     sh '''
                         set -e
-                        kubectl set image deployment/flask-app flask-app=$DOCKER_USER/${APP_NAME}:${IMAGE_TAG} --namespace=default
-                        kubectl rollout status deployment/flask-app --namespace=default
+                        kubectl apply -f deployment.yml
+                        kubectl apply -f service.yml
                     '''
                 }
             }
