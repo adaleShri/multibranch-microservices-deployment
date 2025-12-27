@@ -4,7 +4,7 @@ metadata:
   name: movie-app
   namespace: default
 spec:
-  replicas: 12
+  replicas: 5
   selector:
     matchLabels:
       app: movie-app

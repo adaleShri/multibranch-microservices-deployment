@@ -1,5 +1,8 @@
 pipeline {
     agent any
+     tools {
+        sonarScanner 'sonar-scanner'
+    }
 
     environment {
         APP_NAME  = "multibranch-flask-app"
