@@ -1,6 +1,11 @@
 pipeline {
     agent any
-     tools {
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+    }
+
+    tools {
         sonarScanner 'sonar-scanner'
     }
 
@@ -16,6 +21,33 @@ pipeline {
             steps {
                 echo "=== Checkout Source Code from GitHub ==="
                 git branch: 'main', url: "${REPO_URL}"
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            environment {
+                SCANNER = tool 'sonar-scanner'
+            }
+            steps {
+                echo "🔍 Running SonarQube Scan..."
+
+                withSonarQubeEnv('sonar-server') {
+                    withCredentials([string(
+                        credentialsId: 'sonar-token',
+                        variable: 'SONAR_TOKEN'
+                    )]) {
+
+                        dir('Production-Grade-Deployment-main/Main Branch Code') {
+                            sh """
+                            ${SCANNER}/bin/sonar-scanner \
+                              -Dsonar.projectKey=devops_exam \
+                              -Dsonar.sources=. \
+                              -Dsonar.login=${SONAR_TOKEN}
+                            """
+                        }
+
+                    }
+                }
             }
         }
 
@@ -50,7 +82,7 @@ pipeline {
             }
         }
 
-        stage('Deploy k8s') {
+        stage('Deploy to Kubernetes') {
             steps {
                 echo "=== Deploying to Kubernetes ==="
                 dir('Production-Grade-Deployment-main/Main Branch Code/k8s') {
@@ -70,6 +102,9 @@ pipeline {
         }
         failure {
             echo "❌ Pipeline failed!"
+        }
+        always {
+            cleanWs()
         }
     }
 }
