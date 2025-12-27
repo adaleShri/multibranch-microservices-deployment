@@ -1,10 +1,7 @@
 pipeline {
     agent any
 
-    options {
-        timeout(time: 30, unit: 'MINUTES')
-    }
-
+    
     environment {
         APP_NAME  = "multibranch-flask-app"
         IMAGE_TAG = "latest"
